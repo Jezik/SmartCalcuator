@@ -1,1 +1,1 @@
-# SmartCalcilator
+# SmartCalculator
