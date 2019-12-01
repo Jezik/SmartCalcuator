@@ -28,6 +28,10 @@ class Patterns {
     final static Pattern checkIdentifier = Pattern.compile("[^a-zA-Z]+");
     final static Pattern onlyDigits = Pattern.compile("[0-9]+");
     final static Pattern onlyLetters = Pattern.compile("[a-zA-Z]+");
+    final static Pattern minusToMinusPtn = Pattern.compile("\\s-{11}\\s|\\s-{9}\\s|\\s-{7}\\s|\\s-{5}\\s|\\s-{3}\\s"); //The odd number of minuses gives a minus
+    final static Pattern minusToPlusPtn = Pattern.compile("\\s-{10}\\s|\\s-{8}\\s|\\s-{6}\\s|\\s-{4}\\s|\\s-{2}\\s"); //The even number of minuses gives a plus
+    final static Pattern plusToPlusPtn = Pattern.compile("\\+{2,}"); //Converts '++++++++' to a single '+'
+    final static Pattern spacesPtn = Pattern.compile("\\s{2,}"); //Removes extra spaces
 }
 
 public class Main {
@@ -65,48 +69,81 @@ public class Main {
         }
     }
 
-    private static String prepareCalculationString(Pattern minusToMinus, Pattern minusToPlus, Pattern plusToPlus, Pattern spaces, String str) {
-        Matcher minusToMinusMhr = minusToMinus.matcher(str);
+    private static String prepareCalculationString(String str) {
+        Matcher minusToMinusMhr = Patterns.minusToMinusPtn.matcher(str);
         str = minusToMinusMhr.replaceAll(" - ");
-        Matcher minusToPlusMhr = minusToPlus.matcher(str);
+        Matcher minusToPlusMhr = Patterns.minusToPlusPtn.matcher(str);
         str = minusToPlusMhr.replaceAll(" + ");
-        Matcher plusToPlusMhr = plusToPlus.matcher(str);
+        Matcher plusToPlusMhr = Patterns.plusToPlusPtn.matcher(str);
         str = plusToPlusMhr.replaceAll("+");
-        Matcher spacesMhr = spaces.matcher(str);
+        Matcher spacesMhr = Patterns.spacesPtn.matcher(str);
         str = spacesMhr.replaceAll(" ");
         return str;
     }
 
-    private static int calculate(String[] array) throws Exception {
-        int result = Integer.parseInt(array[0]);
+    private static int calculate(String[] array, Map<String, Integer> vars) {
+        int result = array[0].matches("[0-9]+") ? Integer.parseInt(array[0]) : vars.get(array[0]);
         for (int i = 1; i < array.length; ) {
             if ("+".equals(array[i])) {
-                result += Integer.parseInt(array[i+1]);
+                result += array[i+1].matches("[0-9]+") ? Integer.parseInt(array[i+1]) : vars.get(array[i+1]);
                 i += 2;
             }
             else if ("-".equals(array[i])) {
-                result -= Integer.parseInt(array[i+1]);
+                result -= array[i+1].matches("[0-9]+") ? Integer.parseInt(array[i+1]) : vars.get(array[i+1]);
                 i += 2;
-            }
-            else {
-                throw new Exception();
             }
         }
         return result;
+    }
+
+    private static boolean executeCommand(String command) {
+        boolean nextIteration = true;
+        if (command.equals("/exit")) {
+            nextIteration = false;
+            System.out.println("Bye!");
+        }
+        else if (command.equals("/help")) {
+            System.out.println("The program calculates the result of an expression in a form \"X + Y - Z\"\n" +
+                    "The program supports both unary and binary minus operators.\n" +
+                    "Consider that the even number of minuses gives a plus, and the odd number of minuses gives a minus!\n" +
+                    "Also supports variables, only latin letters are allowed.");
+        }
+        else {
+            System.out.println("Unknown command");
+        }
+
+        return nextIteration;
+    }
+
+    private static void makeCall(String[] array, Map<String, Integer> vars) {
+        if (array.length > 1) {
+            System.out.println("Invalid expression");
+        }
+        else {
+            if (array[0].matches("[0-9]+")) {
+                System.out.println(array[0]);
+            }
+            else if (vars.containsKey(array[0])) {
+                System.out.println(vars.get(array[0]));
+            }
+            else {
+                System.out.println("Unknown variable");
+            }
+        }
     }
 
     public static void main(String[] args) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         Map<String, Integer> variables = new HashMap<>();
 
-        Pattern minusToMinusPtn = Pattern.compile("\\s-{11}\\s|\\s-{9}\\s|\\s-{7}\\s|\\s-{5}\\s|\\s-{3}\\s"); //The odd number of minuses gives a minus
-        Pattern minusToPlusPtn = Pattern.compile("\\s-{10}\\s|\\s-{8}\\s|\\s-{6}\\s|\\s-{4}\\s|\\s-{2}\\s"); //The even number of minuses gives a plus
-        Pattern plusToPlusPtn = Pattern.compile("\\+{2,}"); //Converts '++++++++' to a single '+'
-        Pattern spacesPtn = Pattern.compile("\\s{2,}"); //Removes extra spaces
-
         boolean nextIteration = true;
         while (nextIteration) {
             String str = reader.readLine();
+
+            if ("".equals(str)) {
+                continue;
+            }
+
             Operation operation;
             if (str.contains("=")) {
                 operation = Operation.ASSIGNMENT;
@@ -124,64 +161,18 @@ public class Main {
             switch (operation) {
                 case ASSIGNMENT:
                     makeAssignment(variables, str);
-                    for (Map.Entry<String, Integer> entry : variables.entrySet()) {
-                        System.out.println(entry.getKey() + "->" + entry.getValue());
-                    }
                     break;
                 case CALCULATION:
-                    System.out.println("Calculation string");
+                    str = prepareCalculationString(str);
+                    System.out.println(calculate(str.split(" "), variables));
                     break;
                 case COMMAND:
-                    System.out.println("Command string");
+                    nextIteration = executeCommand(str);
                     break;
                 case CALL:
-                    System.out.println("Call string");
+                    makeCall(str.split(" "), variables);
                     break;
             }
-
-
-            /*if ("".equals(str)) {
-                continue;
-            }*/
-
-            if (str.equals("/exit")) {
-                nextIteration = false;
-                System.out.println("Bye!");
-            }
-            /*else if (str.equals("/help")) {
-                System.out.println("The program calculates the result of an expression in a form \"X + Y - Z\"\n" +
-                        "The program supports both unary and binary minus operators.\n" +
-                "Consider that the even number of minuses gives a plus, and the odd number of minuses gives a minus! ");
-            }
-            else if (str.matches("/\\w*")) {
-                System.out.println("Unknown command");
-            }
-            else {
-                str = prepareCalculationString(minusToMinusPtn, minusToPlusPtn, plusToPlusPtn, spacesPtn, str);
-                String[] array = str.split(" ");
-                try {
-                    System.out.println(calculate(array));
-                }
-                catch(Exception e) {
-                    System.out.println("Invalid expression");
-                }
-            }*/
         }
     }
 }
-
-
-//TODO: Stage VI. Support variables
-//  1. Check what input string is (maybe use enum ans switch for a proper operation):
-//    -assignment (has '=')
-//    -calculation (has '+' or '-')
-//    -command (has '/' as a first symbol)
-//  2. Implement variables and check their names:
-//    -only latin letters (upper and lower; a1 -> 'Invalid identifier')
-//    -check if assignment is proper (only one '=' on a string; a = 5 and a=5 are valid; a = a23d -> 'Invalid assignment')
-//    -constant storage for all variables
-//    -variable could be assigned to a variable (a = b, if b is unknown "Invalid variable')
-//    -check that variable exists
-//  3. Old support of simple examples
-//  4. Support of commands
-//  5. /help command
