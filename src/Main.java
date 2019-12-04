@@ -1,8 +1,7 @@
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
@@ -31,7 +30,8 @@ class Patterns {
     final static Pattern minusToMinusPtn = Pattern.compile("\\s-{11}\\s|\\s-{9}\\s|\\s-{7}\\s|\\s-{5}\\s|\\s-{3}\\s"); //The odd number of minuses gives a minus
     final static Pattern minusToPlusPtn = Pattern.compile("\\s-{10}\\s|\\s-{8}\\s|\\s-{6}\\s|\\s-{4}\\s|\\s-{2}\\s"); //The even number of minuses gives a plus
     final static Pattern plusToPlusPtn = Pattern.compile("\\+{2,}"); //Converts '++++++++' to a single '+'
-    final static Pattern spacesPtn = Pattern.compile("\\s{2,}"); //Removes extra spaces
+    final static Pattern tooMuchAsterics = Pattern.compile("\\*{2,}");
+    final static Pattern tooMuchSlashes = Pattern.compile("\\/{2,}");
 }
 
 public class Main {
@@ -69,31 +69,161 @@ public class Main {
         }
     }
 
-    private static String prepareCalculationString(String str) {
+    private static List<String> prepareCalculationString(String str) {
+        Matcher tooMuchAstericsMhr = Patterns.tooMuchAsterics.matcher(str);
+        Matcher tooMuchSlashesMhr = Patterns.tooMuchSlashes.matcher(str);
+        if (tooMuchAstericsMhr.find() || tooMuchSlashesMhr.find()) {
+            throw new IllegalArgumentException("Invalid expression");
+        }
         Matcher minusToMinusMhr = Patterns.minusToMinusPtn.matcher(str);
         str = minusToMinusMhr.replaceAll(" - ");
         Matcher minusToPlusMhr = Patterns.minusToPlusPtn.matcher(str);
         str = minusToPlusMhr.replaceAll(" + ");
         Matcher plusToPlusMhr = Patterns.plusToPlusPtn.matcher(str);
         str = plusToPlusMhr.replaceAll("+");
-        Matcher spacesMhr = Patterns.spacesPtn.matcher(str);
-        str = spacesMhr.replaceAll(" ");
-        return str;
-    }
+        Matcher spacesMhr = Patterns.removeSpaces.matcher(str);
+        str = spacesMhr.replaceAll("");
 
-    private static int calculate(String[] array, Map<String, Integer> vars) {
-        int result = array[0].matches("[0-9]+") ? Integer.parseInt(array[0]) : vars.get(array[0]);
-        for (int i = 1; i < array.length; ) {
-            if ("+".equals(array[i])) {
-                result += array[i+1].matches("[0-9]+") ? Integer.parseInt(array[i+1]) : vars.get(array[i+1]);
-                i += 2;
+        int prevType = -1;
+        int startIndex = 0;
+        List<String> list = new ArrayList<>();
+        for (int i = 0; i < str.length(); i++) {
+            if (str.charAt(i) == '(' || str.charAt(i) == ')') {
+
+                list.add(str.substring(startIndex, i));
+                prevType = -1;
+                startIndex = i;
+                if (i == str.length() - 1) {
+                    list.add(str.substring(i));
+                }
+                continue;
             }
-            else if ("-".equals(array[i])) {
-                result -= array[i+1].matches("[0-9]+") ? Integer.parseInt(array[i+1]) : vars.get(array[i+1]);
-                i += 2;
+
+            int type = Character.getType(str.charAt(i));
+
+            if (i == 0) {
+                prevType = type;
+                continue;
+            }
+
+            if (type == prevType) {
+                if (i == str.length() - 1) {
+                    list.add(str.substring(startIndex));
+                }
+            }
+            else {
+                list.add(str.substring(startIndex, i));
+                prevType = type;
+                startIndex = i;
+                if (i == str.length() - 1) {
+                    list.add(str.substring(i));
+                }
             }
         }
-        return result;
+        return list;
+    }
+
+    private static List<String> convertToPolishNotation(List<String> inputList) {
+        List<String> polishList = new ArrayList<>();
+        Deque<String> stack = new LinkedList<>();
+        for (String word : inputList) {
+            if (word.matches("\\d+") || word.matches("[a-z]+")) {
+                polishList.add(word);
+            }
+            else if ("+".equals(word) || "-".equals(word)) {
+                if (stack.size() == 0) {
+                    stack.offerLast(word);
+                }
+                else {
+                    if ("(".equals(stack.peekLast())) {
+                        stack.offerLast(word);
+                    }
+                    else {
+                        while (!"(".equals(stack.peekLast()) && stack.size() != 0) {
+                            polishList.add(stack.pollLast());
+                        }
+                        stack.offerLast(word);
+                    }
+                }
+            }
+            else if ("*".equals(word) || "/".equals(word)) {
+                if (stack.size() == 0) {
+                    stack.offerLast(word);
+                }
+                else {
+                    if ("*".equals(stack.peekLast()) || "/".equals(stack.peekLast())) {
+                        while ("*".equals(stack.peekLast()) || "/".equals(stack.peekLast()) || stack.size() != 0) {
+                            polishList.add(stack.pollLast());
+                        }
+                        stack.offerLast(word);
+                    }
+                    else {
+                        stack.offerLast(word);
+                    }
+                }
+            }
+            else if ("(".equals(word)) {
+                stack.offerLast(word);
+            }
+            else if (")".equals(word)) {
+                while (true) {
+                    if (stack.size() == 0) {
+                        throw new IllegalArgumentException("Invalid expression");
+                    }
+                    polishList.add(stack.pollLast());
+                    if ("(".equals(stack.peekLast())) {
+                        stack.pollLast();
+                        break;
+                    }
+                }
+            }
+        }
+
+        while (stack.size() > 0) {
+            if ("(".equals(stack.peekLast())) {
+                throw new IllegalArgumentException("Invalid expression");
+            }
+            polishList.add(stack.pollLast());
+        }
+
+        return polishList;
+    }
+
+    private static int calculate(List<String> list, Map<String, Integer> vars) {
+        Deque<Integer> resultStack = new LinkedList<>();
+        for (String item : list) {
+            if (item.matches("\\d+")) {
+                resultStack.offerLast(Integer.parseInt(item));
+            }
+            else if (item.matches("[a-z]+")) {
+                resultStack.offerLast(vars.get(item));
+            }
+            else {
+                switch (item) {
+                    case "+":
+                        int a = resultStack.pollLast();
+                        int b = resultStack.pollLast();
+                        resultStack.offerLast(a + b);
+                        break;
+                    case "-":
+                        a = resultStack.pollLast();
+                        b = resultStack.pollLast();
+                        resultStack.offerLast(b - a);
+                        break;
+                    case "*":
+                        a = resultStack.pollLast();
+                        b = resultStack.pollLast();
+                        resultStack.offerLast(a * b);
+                        break;
+                    case "/":
+                        a = resultStack.pollLast();
+                        b = resultStack.pollLast();
+                        resultStack.offerLast(b / a);
+                        break;
+                }
+            }
+        }
+        return resultStack.pollLast();
     }
 
     private static boolean executeCommand(String command) {
@@ -104,7 +234,8 @@ public class Main {
         }
         else if (command.equals("/help")) {
             System.out.println("The program calculates the result of an expression in a form \"X + Y - Z\"\n" +
-                    "The program supports both unary and binary minus operators.\n" +
+                    "Supports '+', '-', '*'and '/' operations\n" +
+                    "Supports both unary and binary minus operators.\n" +
                     "Consider that the even number of minuses gives a plus, and the odd number of minuses gives a minus!\n" +
                     "Also supports variables, only latin letters are allowed.");
         }
@@ -120,7 +251,7 @@ public class Main {
             System.out.println("Invalid expression");
         }
         else {
-            if (array[0].matches("[0-9]+")) {
+            if (array[0].matches("-*[0-9]+")) {
                 System.out.println(array[0]);
             }
             else if (vars.containsKey(array[0])) {
@@ -148,7 +279,7 @@ public class Main {
             if (str.contains("=")) {
                 operation = Operation.ASSIGNMENT;
             }
-            else if (str.contains("+") || str.contains("-")) {
+            else if (str.contains("+") || (str.contains("-") && str.charAt(0) != '-') || str.contains("*") || (str.contains("/") && str.charAt(0) != '/')) {
                 operation = Operation.CALCULATION;
             }
             else if (str.startsWith("/")){
@@ -163,8 +294,14 @@ public class Main {
                     makeAssignment(variables, str);
                     break;
                 case CALCULATION:
-                    str = prepareCalculationString(str);
-                    System.out.println(calculate(str.split(" "), variables));
+                    try {
+                        List<String> inputList = prepareCalculationString(str);
+                        inputList = convertToPolishNotation(inputList);
+                        System.out.println(calculate(inputList, variables));
+                    }
+                    catch (IllegalArgumentException e) {
+                        System.out.println(e.getMessage());
+                    }
                     break;
                 case COMMAND:
                     nextIteration = executeCommand(str);
