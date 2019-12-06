@@ -4,6 +4,7 @@ import java.io.InputStreamReader;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.math.BigInteger;
 
 /** Enum holds supported operations
  * ASSIGNMENT values to variables;
@@ -36,7 +37,7 @@ class Patterns {
 
 public class Main {
 
-    private static void makeAssignment(Map<String, Integer> map, String string) {
+    private static void makeAssignment(Map<String, BigInteger> map, String string) {
         Matcher removeSpacesMhr = Patterns.removeSpaces.matcher(string);
         string = removeSpacesMhr.replaceAll("");
         String[] array = string.split("=");
@@ -46,7 +47,7 @@ public class Main {
                 Matcher onlyDigitsMhr = Patterns.onlyDigits.matcher(array[1]);
                 Matcher onlyLettersMhr = Patterns.onlyLetters.matcher(array[1]);
                 if (onlyDigitsMhr.matches()) {
-                    map.put(array[0], Integer.parseInt(array[1]));
+                    map.put(array[0], new BigInteger(array[1]));
                 }
                 else if (onlyLettersMhr.matches()) {
                     if (map.containsKey(array[1])) {
@@ -189,11 +190,11 @@ public class Main {
         return polishList;
     }
 
-    private static int calculate(List<String> list, Map<String, Integer> vars) {
-        Deque<Integer> resultStack = new LinkedList<>();
+    private static BigInteger calculate(List<String> list, Map<String, BigInteger> vars) {
+        Deque<BigInteger> resultStack = new LinkedList<>();
         for (String item : list) {
             if (item.matches("\\d+")) {
-                resultStack.offerLast(Integer.parseInt(item));
+                resultStack.offerLast(new BigInteger(item));
             }
             else if (item.matches("[a-z]+")) {
                 resultStack.offerLast(vars.get(item));
@@ -201,24 +202,24 @@ public class Main {
             else {
                 switch (item) {
                     case "+":
-                        int a = resultStack.pollLast();
-                        int b = resultStack.pollLast();
-                        resultStack.offerLast(a + b);
+                        BigInteger a = resultStack.pollLast();
+                        BigInteger b = resultStack.pollLast();
+                        resultStack.offerLast(a.add(b));
                         break;
                     case "-":
                         a = resultStack.pollLast();
                         b = resultStack.pollLast();
-                        resultStack.offerLast(b - a);
+                        resultStack.offerLast(b.subtract(a));
                         break;
                     case "*":
                         a = resultStack.pollLast();
                         b = resultStack.pollLast();
-                        resultStack.offerLast(a * b);
+                        resultStack.offerLast(a.multiply(b));
                         break;
                     case "/":
                         a = resultStack.pollLast();
                         b = resultStack.pollLast();
-                        resultStack.offerLast(b / a);
+                        resultStack.offerLast(b.divide(a));
                         break;
                 }
             }
@@ -246,7 +247,7 @@ public class Main {
         return nextIteration;
     }
 
-    private static void makeCall(String[] array, Map<String, Integer> vars) {
+    private static void makeCall(String[] array, Map<String, BigInteger> vars) {
         if (array.length > 1) {
             System.out.println("Invalid expression");
         }
@@ -265,7 +266,7 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        Map<String, Integer> variables = new HashMap<>();
+        Map<String, BigInteger> variables = new HashMap<>();
 
         boolean nextIteration = true;
         while (nextIteration) {
